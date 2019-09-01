@@ -124,7 +124,7 @@ func (mr *MapReduce) StartRegistrationServer() {
 					conn.Close()
 				}()
 			} else {
-				DPrintf("RegistrationServer: accept error", err)
+				DPrintf("RegistrationServer: accept error ,%v", err)
 				break
 			}
 		}
@@ -192,6 +192,7 @@ func ihash(s string) uint32 {
 // partitions.
 func DoMap(JobNumber int, fileName string,
 	nreduce int, Map func(string) *list.List) {
+	log.Printf("now we execute the jobNumber is %d", JobNumber)
 	name := MapName(fileName, JobNumber)
 	file, err := os.Open(name)
 	if err != nil {

@@ -16,8 +16,10 @@ type ViewServer struct {
 	rpccount int32 // for testing
 	me       string
 
-
 	// Your declarations here.
+	View           View
+	idle           []string
+	ServerPingTime map[string]time.Time
 }
 
 //
@@ -25,9 +27,62 @@ type ViewServer struct {
 //
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
+	// it hasn't received recent Pings from both primary and backup
+	// if the primary or backup crashed and restarted (存在me,but the ping is 0)
+	// there is no backup and there is an idle server
+
+	//must be primary and  same num
+	viewNum := args.Viewnum
 	// Your code here.
 
+	if &vs.View == nil {
+		vs.View = *new(View)
+	}
+	view := &vs.View
+
+	if checkCreateNewView(vs, args) && args.Me == view.Primary {
+		view.Viewnum = view.Viewnum + 1
+	}
+
+	switch {
+	case viewNum == 0 && view.Primary == "":
+		view.Primary = args.Me
+		view.Viewnum = view.Viewnum + 1
+	case args.Me != view.Primary && viewNum == 0:
+		vs.idle = append(vs.idle, args.Me)
+	case args.Me == view.Primary && len(vs.idle) != 0:
+		view.Backup = vs.idle[0]
+		vs.idle = vs.idle[1:]
+	}
+
+	reply.View = *view
+
+	if vs.ServerPingTime == nil {
+		vs.ServerPingTime = make(map[string]time.Time)
+	}
+	vs.ServerPingTime[args.Me] = time.Now()
 	return nil
+}
+
+func checkCreateNewView(vs *ViewServer, args *PingArgs) bool {
+	View := vs.View
+
+	if View.Backup == "" && View.Primary == "" {
+		return true
+	}
+
+	if args.Me == View.Backup || args.Me == View.Primary {
+
+		if View.Viewnum == 0 {
+			return true
+		}
+	}
+
+	if View.Backup == "" && len(vs.idle) > 0 {
+		return true
+	}
+
+	return false
 }
 
 //
@@ -36,10 +91,10 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 
 	// Your code here.
+	reply.View = vs.View
 
 	return nil
 }
-
 
 //
 // tick() is called once per PingInterval; it should notice

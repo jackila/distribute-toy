@@ -1,0 +1,11 @@
+1. 介绍rpc
+2. detail of rpc
+    component
+        marshalling
+        binding
+        threads
+    Failures
+        lost packet
+        broken net
+        server crash
+        net/server slow
