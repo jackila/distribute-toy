@@ -1,11 +1,14 @@
 package viewservice
 
-import "testing"
-import "runtime"
-import "time"
-import "fmt"
-import "os"
-import "strconv"
+import (
+	"fmt"
+	"log"
+	"os"
+	"runtime"
+	"strconv"
+	"testing"
+	"time"
+)
 
 func check(t *testing.T, ck *Clerk, p string, b string, n uint) {
 	view, _ := ck.Get()
@@ -44,7 +47,7 @@ func Test1(t *testing.T) {
 	ck3 := MakeClerk(port("3"), vshost)
 
 	//
-
+	log.SetOutput(new(EmptyOutput))
 	if ck1.Primary() != "" {
 		t.Fatalf("there was a primary too soon")
 	}
@@ -208,6 +211,7 @@ func Test1(t *testing.T) {
 	}
 	fmt.Printf("  ... Passed\n")
 
+	log.SetOutput(os.Stdout)
 	// if old servers die, check that a new (uninitialized) server
 	// cannot take over.
 	fmt.Printf("Test: Uninitialized server can't become primary ...\n")
@@ -215,11 +219,14 @@ func Test1(t *testing.T) {
 	{
 		for i := 0; i < DeadPings*2; i++ {
 			v, _ := ck1.Get()
+			log.Printf("the value is %v", v)
 			ck1.Ping(v.Viewnum)
 			ck2.Ping(0)
 			ck3.Ping(v.Viewnum)
 			time.Sleep(PingInterval)
 		}
+		log.Printf("finished init")
+		//[3,1] 2
 		for i := 0; i < DeadPings*2; i++ {
 			ck2.Ping(0)
 			time.Sleep(PingInterval)
@@ -232,4 +239,13 @@ func Test1(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 
 	vs.Kill()
+
+}
+
+type EmptyOutput struct {
+}
+
+func (eo *EmptyOutput) Write(p []byte) (n int, err error) {
+	//do notiong
+	return 0, nil
 }
