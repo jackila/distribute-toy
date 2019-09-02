@@ -2,7 +2,6 @@ package viewservice
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"runtime"
 	"strconv"
@@ -47,7 +46,7 @@ func Test1(t *testing.T) {
 	ck3 := MakeClerk(port("3"), vshost)
 
 	//
-	log.SetOutput(new(EmptyOutput))
+	//log.SetOutput(new(EmptyOutput))
 	if ck1.Primary() != "" {
 		t.Fatalf("there was a primary too soon")
 	}
@@ -211,7 +210,7 @@ func Test1(t *testing.T) {
 	}
 	fmt.Printf("  ... Passed\n")
 
-	log.SetOutput(os.Stdout)
+	//log.SetOutput(os.Stdout)
 	// if old servers die, check that a new (uninitialized) server
 	// cannot take over.
 	fmt.Printf("Test: Uninitialized server can't become primary ...\n")
@@ -219,14 +218,14 @@ func Test1(t *testing.T) {
 	{
 		for i := 0; i < DeadPings*2; i++ {
 			v, _ := ck1.Get()
-			log.Printf("the value is %v", v)
+			//log.Printf("the value is %v", v)
 			ck1.Ping(v.Viewnum)
 			ck2.Ping(0)
 			ck3.Ping(v.Viewnum)
 			time.Sleep(PingInterval)
 		}
-		log.Printf("finished init")
-		//[3,1] 2
+		//log.Printf("finished init")
+		//[1,3] 2
 		for i := 0; i < DeadPings*2; i++ {
 			ck2.Ping(0)
 			time.Sleep(PingInterval)

@@ -31,7 +31,8 @@ type ViewServer struct {
 //
 // 只有view num变化了 才会对primary backup 进行切换
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
-
+	// vs.mu.Lock()
+	// defer vs.mu.Unlock()
 	//must be primary and  same num
 	//viewNum := args.Viewnum
 	// Your code here.
@@ -47,6 +48,12 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 	}
 	view := &vs.View
 
+	if vs.PrimaryCrashed && vs.BackupCrashed {
+		//log.Printf("all crashed")
+		reply.View = *view
+		return nil
+	}
+
 	if view.Primary == "" && view.Backup == "" {
 		//初次注册,可以直接设置并且更改view num
 		view.Primary = args.Me
@@ -56,7 +63,7 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 		return nil
 	}
 
-	//crashed
+	//primary crashed
 	if view.Primary == args.Me && args.Viewnum == 0 {
 		vs.PrimaryCrashed = true
 		//crashed  之后,再次ping0 可以放入备用
@@ -65,17 +72,16 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 		return nil
 	}
 
-	if vs.PrimaryCrashed && vs.BackupCrashed {
-		log.Printf("all crashed")
-		view.Primary = ""
-		view.Backup = ""
+	//backup crashed
+	if view.Backup == args.Me && args.Viewnum == 0 {
+		vs.BackupCrashed = true
+		//crashed  之后,再次ping0 可以放入备用
 		reply.View = *view
 		return nil
 	}
 
-	log.Printf("the backup is %s and the Me is %s", view.Backup, args.Me)
+	//log.Printf("the request args is %v. and the idel is %s,", args, vs.idle)
 	if vs.PrimaryCrashed && view.Backup == args.Me && vs.acked {
-		log.Printf("did it do this p server %s", args.Me)
 		view.Viewnum = view.Viewnum + 1
 		view.Primary = view.Backup
 
@@ -92,7 +98,7 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 	}
 
 	if vs.BackupCrashed && view.Primary == args.Me {
-		log.Printf("did it do this b server")
+		//log.Printf("did it do this b server")
 		view.Viewnum = view.Viewnum + 1
 		if vs.idle != "" {
 			view.Backup = vs.idle
@@ -170,6 +176,8 @@ func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 //
 func (vs *ViewServer) tick() {
 
+	// vs.mu.Lock()
+	// defer vs.mu.Unlock()
 	// Your code here.
 	View := vs.View
 	if &View == nil {
@@ -182,13 +190,11 @@ func (vs *ViewServer) tick() {
 	}
 
 	if checkServerDead(View.Primary, vs.ServerPingTime) {
-		log.Printf("p server is out of line")
 		vs.PrimaryCrashed = true
 		//promote the backup
 	}
 
 	if checkServerDead(View.Backup, vs.ServerPingTime) {
-		log.Printf("b server is out of line")
 		vs.BackupCrashed = true
 	}
 
