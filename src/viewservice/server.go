@@ -37,12 +37,9 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 	//viewNum := args.Viewnum
 	// Your code here.
 	// there is no backup and there is an idle server
-
-	if vs.ServerPingTime == nil {
-		vs.ServerPingTime = make(map[string]time.Time)
-	}
+	vs.mu.Lock()
 	vs.ServerPingTime[args.Me] = time.Now()
-
+	vs.mu.Unlock()
 	if &vs.View == nil {
 		vs.View = *new(View)
 	}
@@ -189,25 +186,27 @@ func (vs *ViewServer) tick() {
 		return
 	}
 
-	if checkServerDead(View.Primary, vs.ServerPingTime) {
+	if checkServerDead(View.Primary, vs.ServerPingTime, vs.mu) {
 		vs.PrimaryCrashed = true
 		//promote the backup
 	}
 
-	if checkServerDead(View.Backup, vs.ServerPingTime) {
+	if checkServerDead(View.Backup, vs.ServerPingTime, vs.mu) {
 		vs.BackupCrashed = true
 	}
 
-	if checkServerDead(vs.idle, vs.ServerPingTime) {
+	if checkServerDead(vs.idle, vs.ServerPingTime, vs.mu) {
 		vs.idle = ""
 	}
 }
 
-func checkServerDead(me string, recent map[string]time.Time) bool {
+func checkServerDead(me string, recent map[string]time.Time, mu sync.Mutex) bool {
 	if me == "" {
 		return false
 	}
+	mu.Lock()
 	recentTime, ok := recent[me]
+	mu.Unlock()
 	if !ok {
 		log.Printf("we have not find the recent ping of %s from map", me)
 		return false
@@ -253,7 +252,7 @@ func StartServer(me string) *ViewServer {
 	vs := new(ViewServer)
 	vs.me = me
 	// Your vs.* initializations here.
-
+	vs.ServerPingTime = make(map[string]time.Time)
 	// tell net/rpc about our RPC server and handlers.
 	rpcs := rpc.NewServer()
 	rpcs.Register(vs)

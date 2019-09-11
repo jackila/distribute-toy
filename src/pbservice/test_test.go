@@ -248,6 +248,7 @@ func TestFailPut(t *testing.T) {
 	time.Sleep(time.Second)
 	s3 := StartServer(vshost, port(tag, 3))
 
+	//why do this
 	for i := 0; i < viewservice.DeadPings*3; i++ {
 		v, _ := vck.Get()
 		if v.Primary != "" && v.Backup != "" {
@@ -362,6 +363,7 @@ func TestConcurrentSame(t *testing.T) {
 			for atomic.LoadInt32(&done) == 0 {
 				k := strconv.Itoa(rr.Int() % nkeys)
 				v := strconv.Itoa(rr.Int())
+				//log.Printf("the key is %s, the value is %s", k, v)
 				ck.Put(k, v)
 			}
 		}(xi)
@@ -422,6 +424,7 @@ func TestConcurrentSame(t *testing.T) {
 // and are in order for each concurrent client.
 func checkAppends(t *testing.T, v string, counts []int) {
 	nclients := len(counts)
+	//log.Printf("the value is %+v", v)
 	for i := 0; i < nclients; i++ {
 		lastoff := -1
 		for j := 0; j < counts[i]; j++ {
@@ -432,7 +435,7 @@ func checkAppends(t *testing.T, v string, counts []int) {
 			}
 			off1 := strings.LastIndex(v, wanted)
 			if off1 != off {
-				t.Fatalf("duplicate element in Append result")
+				t.Fatalf("duplicate element in Append result,the off1 is %d,the off is %d and the wanted is %v", off1, off, wanted)
 			}
 			if off <= lastoff {
 				t.Fatalf("wrong order for element in Append result")
@@ -512,6 +515,7 @@ func TestConcurrentSameAppend(t *testing.T) {
 	// check that primary's copy of the value has all
 	// the Append()s.
 	primaryv := ck.Get("k")
+	//log.Printf("the primaryv is %+v,and the count is %+v", primaryv, counts)
 	checkAppends(t, primaryv, counts)
 
 	// kill the primary so we can check the backup
@@ -703,7 +707,8 @@ func TestRepeatedCrash(t *testing.T) {
 		rr := rand.New(rand.NewSource(int64(os.Getpid())))
 		for atomic.LoadInt32(&done) == 0 {
 			i := rr.Int() % nservers
-			// fmt.Printf("%v killing %v\n", ts(), 5001+i)
+			//fmt.Printf("%v killing %v\n", ts(), 5001+i)
+			//log.Printf("the server of %v is kill", i)
 			sa[i].kill()
 
 			// wait long enough for new view to form, backup to be initialized
@@ -725,12 +730,14 @@ func TestRepeatedCrash(t *testing.T) {
 		cha[xi] = make(chan bool)
 		go func(i int) {
 			ok := false
+			//log.Printf("now start the function")
 			defer func() { cha[i] <- ok }()
 			ck := MakeClerk(vshost, "")
 			data := map[string]string{}
 			rr := rand.New(rand.NewSource(int64(os.Getpid() + i)))
 			for atomic.LoadInt32(&done) == 0 {
 				k := strconv.Itoa((i * 1000000) + (rr.Int() % 10))
+				//log.Printf("now fetch the k data %v", k)
 				wanted, ok := data[k]
 				if ok {
 					v := ck.Get(k)
@@ -746,6 +753,7 @@ func TestRepeatedCrash(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 			}
 			ok = true
+			//log.Printf("the data have bean finish")
 		}(xi)
 	}
 

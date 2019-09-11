@@ -107,12 +107,15 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	args.Type = op
 	sucess := false
 	for !sucess {
+		//log.Printf("now the primary is %+v", ck)
 		for ck.Primary == "" {
 			ck.Primary = ck.vs.Primary()
 		}
 		sucess := call(ck.Primary, "PBServer.PutAppend", &args, &reply)
 		if sucess {
 			break
+		} else {
+			ck.Primary = ck.vs.Primary()
 		}
 		//log.Printf("the ck.Primary is %s ,the sucess status is %t", ck.Primary, sucess)
 	}

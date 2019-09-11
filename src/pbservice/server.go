@@ -28,9 +28,10 @@ type PBServer struct {
 func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 
 	// Your code here.
-
+	pb.mu.Lock()
 	value, _ := pb.store[args.Key]
 	reply.Value = value
+	pb.mu.Unlock()
 	//log.Printf("the me is %s,the stroe is %v", pb.me, pb.store)
 	return nil
 }
@@ -40,9 +41,11 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	// Your code here.
 	//log.Printf("now the request is %+v", args)
 	//log.Printf("current request is %s,and the store is %+v", pb.me, pb.store)
+	pb.mu.Lock()
 	key := args.XID
 	_, ok := pb.XIDS[key]
 	if ok {
+		pb.mu.Unlock()
 		return nil
 	}
 
@@ -58,18 +61,25 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 			v = value + args.Value
 		}
 	}
+
 	pb.XIDS[args.XID] = v
 	pb.store[args.Key] = v
+
 	//如果backup存在,将数据保存在backup中
 	//
 	if pb.me == pb.view.Primary && pb.view.Backup != "" {
+
+		//log.Printf("now the copy from %s to %s .the value is %v", pb.view.Primary, pb.view.Backup, v)
 		backArgs := args
 		backReply := new(PutAppendReply)
-		backArgs.Value = v
-		call(pb.view.Backup, "PBServer.PutAppend", &backArgs, &backReply)
-		//log.Printf("成功将数据同步到backup中:%t", success)
-	}
+		backArgs.Value = args.Value
+		success := call(pb.view.Backup, "PBServer.PutAppend", &backArgs, &backReply)
+		if !success {
+			//log.Printf("将数据同步到backup中 失败:%t", success)
+		}
 
+	}
+	pb.mu.Unlock()
 	return nil
 }
 
@@ -98,6 +108,7 @@ func (pb *PBServer) tick() {
 			backArgs.Key = key
 			backArgs.Value = value
 			backArgs.Type = "Put"
+			backArgs.XID = nrand()
 			call(view.Backup, "PBServer.PutAppend", &backArgs, &backReply)
 		}
 	}
