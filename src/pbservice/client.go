@@ -1,16 +1,17 @@
 package pbservice
 
-import "viewservice"
-import "net/rpc"
-import "fmt"
-
-import "crypto/rand"
-import "math/big"
-
+import (
+	"crypto/rand"
+	"fmt"
+	"math/big"
+	"net/rpc"
+	"viewservice"
+)
 
 type Clerk struct {
 	vs *viewservice.Clerk
 	// Your declarations here
+	Primary string
 }
 
 // this may come in handy.
@@ -25,10 +26,9 @@ func MakeClerk(vshost string, me string) *Clerk {
 	ck := new(Clerk)
 	ck.vs = viewservice.MakeClerk(me, vshost)
 	// Your ck.* initializations here
-
+	ck.Primary = ck.vs.Primary()
 	return ck
 }
-
 
 //
 // call() sends an RPC to the rpcname handler on server srv
@@ -74,8 +74,23 @@ func call(srv string, rpcname string,
 func (ck *Clerk) Get(key string) string {
 
 	// Your code here.
+	args := new(GetArgs)
+	reply := new(GetReply)
+	args.Key = key
+	Primary := ck.Primary
+	for Primary != "" {
+		sucess := call(Primary, "PBServer.Get", &args, &reply)
+		if sucess {
+			//log.Printf("the result of the value is %+v", reply.Value)
+			return reply.Value
+		} else {
+			//重新获取 primary
+			Primary = ck.vs.Primary()
+			//log.Printf("reget the primary url %s", Primary)
+		}
+	}
 
-	return "???"
+	return ""
 }
 
 //
@@ -84,6 +99,24 @@ func (ck *Clerk) Get(key string) string {
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 	// Your code here.
+	args := new(PutAppendArgs)
+	reply := new(PutAppendReply)
+	args.XID = nrand()
+	args.Key = key
+	args.Value = value
+	args.Type = op
+	sucess := false
+	for !sucess {
+		for ck.Primary == "" {
+			ck.Primary = ck.vs.Primary()
+		}
+		sucess := call(ck.Primary, "PBServer.PutAppend", &args, &reply)
+		if sucess {
+			break
+		}
+		//log.Printf("the ck.Primary is %s ,the sucess status is %t", ck.Primary, sucess)
+	}
+	//log.Printf("the put append is over")
 }
 
 //
@@ -100,4 +133,8 @@ func (ck *Clerk) Put(key string, value string) {
 //
 func (ck *Clerk) Append(key string, value string) {
 	ck.PutAppend(key, value, "Append")
+}
+
+func (ck *Clerk) fetchPrimary() {
+	ck.Primary = ck.vs.Primary()
 }

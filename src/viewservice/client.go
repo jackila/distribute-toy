@@ -1,7 +1,9 @@
 package viewservice
 
-import "net/rpc"
-import "fmt"
+import (
+	"fmt"
+	"net/rpc"
+)
 
 //
 // the viewservice Clerk lives in the client
@@ -81,6 +83,7 @@ func (ck *Clerk) Get() (View, bool) {
 
 func (ck *Clerk) Primary() string {
 	v, ok := ck.Get()
+	//log.Printf("the view is %v,the status is %v", v, ok)
 	if ok {
 		return v.Primary
 	}

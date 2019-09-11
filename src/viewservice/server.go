@@ -181,11 +181,11 @@ func (vs *ViewServer) tick() {
 	// Your code here.
 	View := vs.View
 	if &View == nil {
-		log.Printf("not server register to vs")
+		//log.Printf("not server register to vs")
 		return
 	}
 	if View.Primary == "" && View.Backup == "" {
-		log.Printf("not server register to vs although the View is inited")
+		//log.Printf("not server register to vs although the View is inited")
 		return
 	}
 

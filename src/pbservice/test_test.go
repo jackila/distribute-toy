@@ -17,6 +17,7 @@ import "sync/atomic"
 
 func check(ck *Clerk, key string, value string) {
 	v := ck.Get(key)
+	//log.Printf("the ck is %+v ,key is %s,value is %+v", ck, key, v)
 	if v != value {
 		log.Fatalf("Get(%v) -> %v, expected %v", key, v, value)
 	}
@@ -36,8 +37,10 @@ func port(tag string, host int) string {
 func TestBasicFail(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 
+	//log.SetOutput(new(EmptyOutput))
 	tag := "basic"
 	vshost := port(tag+"v", 1)
+	log.Printf("the vshost is %s", vshost)
 	vs := viewservice.StartServer(vshost)
 	time.Sleep(time.Second)
 	vck := viewservice.MakeClerk("", vshost)
@@ -55,6 +58,7 @@ func TestBasicFail(t *testing.T) {
 	}
 
 	ck.Put("111", "v1")
+	//log.Printf("finish put 111")
 	check(ck, "111", "v1")
 
 	ck.Put("2", "v2")
@@ -123,7 +127,7 @@ func TestBasicFail(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 
 	// kill the primary
-
+	//log.SetOutput(os.Stdout)
 	fmt.Printf("Test: Primary failure ...\n")
 
 	s1.kill()
@@ -207,12 +211,12 @@ func TestAtMostOnce(t *testing.T) {
 	ck := MakeClerk(vshost, "")
 	k := "counter"
 	val := ""
+
 	for i := 0; i < 100; i++ {
 		v := strconv.Itoa(i)
 		ck.Append(k, v)
 		val = val + v
 	}
-
 	v := ck.Get(k)
 	if v != val {
 		t.Fatalf("ck.Get() returned %v but expected %v\n", v, val)
@@ -1140,4 +1144,12 @@ func TestPartition2(t *testing.T) {
 	s2.kill()
 	s3.kill()
 	vs.Kill()
+}
+
+type EmptyOutput struct {
+}
+
+func (eo *EmptyOutput) Write(p []byte) (n int, err error) {
+	//do notiong
+	return 0, nil
 }
