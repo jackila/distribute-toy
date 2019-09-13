@@ -1,19 +1,21 @@
 package pbservice
 
-import "viewservice"
-import "fmt"
-import "io"
-import "net"
-import "testing"
-import "time"
-import "log"
-import "runtime"
-import "math/rand"
-import "os"
-import "sync"
-import "strconv"
-import "strings"
-import "sync/atomic"
+import (
+	"fmt"
+	"io"
+	"log"
+	"math/rand"
+	"net"
+	"os"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+	"viewservice"
+)
 
 func check(ck *Clerk, key string, value string) {
 	v := ck.Get(key)
@@ -671,7 +673,7 @@ func TestConcurrentSameUnreliable(t *testing.T) {
 }
 
 // constant put/get while crashing and restarting servers
-func TestRepeatedCrash(t *testing.T) {
+func TestRepeatedCrash1(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 
 	tag := "rc"
@@ -707,8 +709,7 @@ func TestRepeatedCrash(t *testing.T) {
 		rr := rand.New(rand.NewSource(int64(os.Getpid())))
 		for atomic.LoadInt32(&done) == 0 {
 			i := rr.Int() % nservers
-			//fmt.Printf("%v killing %v\n", ts(), 5001+i)
-			//log.Printf("the server of %v is kill", i)
+			//log.Printf("now i will kill server %s", sa[i].me)
 			sa[i].kill()
 
 			// wait long enough for new view to form, backup to be initialized
@@ -716,6 +717,7 @@ func TestRepeatedCrash(t *testing.T) {
 
 			sss := StartServer(vshost, port(tag, i+1))
 			samu.Lock()
+			//log.Printf("a new server is starting %s", sss.me)
 			sa[i] = sss
 			samu.Unlock()
 
@@ -730,14 +732,14 @@ func TestRepeatedCrash(t *testing.T) {
 		cha[xi] = make(chan bool)
 		go func(i int) {
 			ok := false
-			//log.Printf("now start the function")
-			defer func() { cha[i] <- ok }()
+			defer func() {
+				cha[i] <- ok
+			}()
 			ck := MakeClerk(vshost, "")
 			data := map[string]string{}
 			rr := rand.New(rand.NewSource(int64(os.Getpid() + i)))
 			for atomic.LoadInt32(&done) == 0 {
 				k := strconv.Itoa((i * 1000000) + (rr.Int() % 10))
-				//log.Printf("now fetch the k data %v", k)
 				wanted, ok := data[k]
 				if ok {
 					v := ck.Get(k)
@@ -746,23 +748,27 @@ func TestRepeatedCrash(t *testing.T) {
 					}
 				}
 				nv := strconv.Itoa(rr.Int())
+				//log.Printf("%d: now %d request to the ck is %+v", time.Now().Unix(), i, ck)
 				ck.Put(k, nv)
 				data[k] = nv
 				// if no sleep here, then server tick() threads do not get
 				// enough time to Ping the viewserver.
+
 				time.Sleep(10 * time.Millisecond)
+
 			}
 			ok = true
-			//log.Printf("the data have bean finish")
 		}(xi)
 	}
 
 	time.Sleep(20 * time.Second)
+	log.Println("*************** close the loooooooooop ***************")
 	atomic.StoreInt32(&done, 1)
 
 	fmt.Printf("  ... Put/Gets done ... \n")
 
 	for i := 0; i < nth; i++ {
+		time.Sleep(time.Second)
 		ok := <-cha[i]
 		if ok == false {
 			t.Fatal("child failed")

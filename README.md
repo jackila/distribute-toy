@@ -12,6 +12,11 @@ Sep 11, 2019 8:56 PM
 -- class 4
 -- lab2 partB
 
+Sep 13, 2019 6:19 PM
+-- class 4
+-- lab2 partB
+mainly repaire the bug of former and refactor the code
+
 # 学习困难
 
 the really work code is only little .and the test code is vary import

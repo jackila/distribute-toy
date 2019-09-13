@@ -38,64 +38,49 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 	// Your code here.
 	// there is no backup and there is an idle server
 	vs.mu.Lock()
+	defer vs.mu.Unlock()
 	vs.ServerPingTime[args.Me] = time.Now()
-	vs.mu.Unlock()
-	if &vs.View == nil {
-		vs.View = *new(View)
-	}
+
 	view := &vs.View
-
-	if vs.PrimaryCrashed && vs.BackupCrashed {
-		//log.Printf("all crashed")
-		reply.View = *view
-		return nil
+	if args.Me == view.Primary && args.Viewnum == view.Viewnum {
+		vs.acked = true
 	}
-
-	if view.Primary == "" && view.Backup == "" {
-		//初次注册,可以直接设置并且更改view num
-		view.Primary = args.Me
+	me := args.Me
+	switch {
+	case vs.PrimaryCrashed && vs.BackupCrashed:
+		//do nothing
+	case view.Primary == "" && view.Backup == "":
+		view.Primary = me
 		view.Viewnum = view.Viewnum + 1
 		vs.acked = false
-		reply.View = *view
-		return nil
-	}
 
-	//primary crashed
-	if view.Primary == args.Me && args.Viewnum == 0 {
+	case view.Primary == me && args.Viewnum == 0:
 		vs.PrimaryCrashed = true
 		//crashed  之后,再次ping0 可以放入备用
-		vs.idle = args.Me
-		reply.View = *view
-		return nil
-	}
+		vs.idle = me
 
-	//backup crashed
-	if view.Backup == args.Me && args.Viewnum == 0 {
+	case view.Backup == me && args.Viewnum == 0:
 		vs.BackupCrashed = true
 		//crashed  之后,再次ping0 可以放入备用
-		reply.View = *view
-		return nil
-	}
 
-	//log.Printf("the request args is %v. and the idel is %s,", args, vs.idle)
-	if vs.PrimaryCrashed && view.Backup == args.Me && vs.acked {
+	case vs.PrimaryCrashed && view.Backup == me && vs.acked:
+		//todo
 		view.Viewnum = view.Viewnum + 1
-		view.Primary = view.Backup
-
+		backUp := view.Backup
 		if vs.idle != "" {
-			view.Backup = vs.idle
+			if vs.idle != me {
+				view.Backup = vs.idle
+			}
 			vs.idle = ""
 		} else {
 			view.Backup = ""
 		}
+		view.Primary = backUp
+
 		vs.PrimaryCrashed = false
 		vs.acked = false
-		reply.View = *view
-		return nil
-	}
 
-	if vs.BackupCrashed && view.Primary == args.Me {
-		//log.Printf("did it do this b server")
+	case vs.BackupCrashed && view.Primary == me:
 		view.Viewnum = view.Viewnum + 1
 		if vs.idle != "" {
 			view.Backup = vs.idle
@@ -104,55 +89,22 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 			view.Backup = ""
 		}
 		vs.BackupCrashed = false
-		reply.View = *view
-		return nil
-	}
 
-	if args.Me == view.Primary && args.Viewnum == view.Viewnum {
-		vs.acked = true
-	}
-
-	if vs.acked {
-		if args.Me != view.Primary {
-			if view.Backup == "" {
-				vs.acked = false
-				view.Viewnum = view.Viewnum + 1
-				view.Backup = args.Me
-				reply.View = *view
-				return nil
-			}
+	case vs.acked && me != view.Primary && view.Backup == "":
+		vs.acked = false
+		view.Viewnum = view.Viewnum + 1
+		if me == vs.idle {
+			vs.idle = ""
 		}
+		view.Backup = me
 
-	} else {
-		if args.Me != view.Primary && args.Me != view.Backup {
-			vs.idle = args.Me
-		}
+	case !vs.acked && me != view.Primary && me != view.Backup:
+		vs.idle = me
 	}
+
 	reply.View = *view
 	return nil
-}
 
-func checkCreateNewView(vs *ViewServer, args *PingArgs) bool {
-	View := vs.View
-	// it hasn't received recent Pings from both primary and backup
-	if View.Backup == "" && View.Primary == "" {
-		return true
-	}
-	// if the primary or backup  restarted (存在me,but the ping is 0)
-	if View.Viewnum == 0 {
-		return true
-	}
-
-	// if the primary or backup crashed
-	if vs.pbCrashed {
-		vs.pbCrashed = false
-		return true
-	}
-	if View.Backup == "" && len(vs.idle) > 0 {
-		return true
-	}
-
-	return false
 }
 
 //
@@ -161,6 +113,8 @@ func checkCreateNewView(vs *ViewServer, args *PingArgs) bool {
 func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 
 	// Your code here.
+	vs.mu.Lock()
+	defer vs.mu.Unlock()
 	reply.View = vs.View
 
 	return nil
@@ -173,28 +127,21 @@ func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 //
 func (vs *ViewServer) tick() {
 
-	// vs.mu.Lock()
-	// defer vs.mu.Unlock()
 	// Your code here.
 	View := vs.View
-	if &View == nil {
-		//log.Printf("not server register to vs")
-		return
-	}
 	if View.Primary == "" && View.Backup == "" {
-		//log.Printf("not server register to vs although the View is inited")
 		return
 	}
 
 	if checkServerDead(View.Primary, vs.ServerPingTime, vs.mu) {
 		vs.PrimaryCrashed = true
-		//promote the backup
 	}
 
 	if checkServerDead(View.Backup, vs.ServerPingTime, vs.mu) {
 		vs.BackupCrashed = true
 	}
 
+	//to be reactor
 	if checkServerDead(vs.idle, vs.ServerPingTime, vs.mu) {
 		vs.idle = ""
 	}
@@ -204,26 +151,17 @@ func checkServerDead(me string, recent map[string]time.Time, mu sync.Mutex) bool
 	if me == "" {
 		return false
 	}
-	mu.Lock()
+	//mu.Lock()
 	recentTime, ok := recent[me]
-	mu.Unlock()
+	//mu.Unlock()
 	if !ok {
 		log.Printf("we have not find the recent ping of %s from map", me)
 		return false
 	}
-	//log.Printf("the recent ping is %s", recentTime.Format(time.RFC3339))
 	duration := time.Since(recentTime)
-	//log.Printf("the duration is %d", duration.Nanoseconds())
 	limit := DeadPings * PingInterval
 
-	//log.Printf("the limit time is %f,the duration time is %f", limit.Seconds(), duration.Seconds())
-	if limit.Seconds() > duration.Seconds() {
-		return false
-	} else {
-		//log.Printf("the server %s is overtime, so it will be removed", me)
-		return true
-	}
-
+	return limit.Seconds() <= duration.Seconds()
 }
 
 //
@@ -253,6 +191,7 @@ func StartServer(me string) *ViewServer {
 	vs.me = me
 	// Your vs.* initializations here.
 	vs.ServerPingTime = make(map[string]time.Time)
+	vs.View = *new(View)
 	// tell net/rpc about our RPC server and handlers.
 	rpcs := rpc.NewServer()
 	rpcs.Register(vs)

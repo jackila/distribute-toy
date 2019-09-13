@@ -39,9 +39,8 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 
 	// Your code here.
-	//log.Printf("now the request is %+v", args)
-	//log.Printf("current request is %s,and the store is %+v", pb.me, pb.store)
 	pb.mu.Lock()
+	//log.Printf("now the request is %d and the me is %s and the view is %+v", args.XID, pb.me, pb.view)
 	key := args.XID
 	_, ok := pb.XIDS[key]
 	if ok {
@@ -67,15 +66,14 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 
 	//如果backup存在,将数据保存在backup中
 	//
-	if pb.me == pb.view.Primary && pb.view.Backup != "" {
+	for pb.me == pb.view.Primary && pb.view.Backup != "" {
 
-		//log.Printf("now the copy from %s to %s .the value is %v", pb.view.Primary, pb.view.Backup, v)
 		backArgs := args
 		backReply := new(PutAppendReply)
 		backArgs.Value = args.Value
 		success := call(pb.view.Backup, "PBServer.PutAppend", &backArgs, &backReply)
-		if !success {
-			//log.Printf("将数据同步到backup中 失败:%t", success)
+		if success {
+			break
 		}
 
 	}

@@ -2,9 +2,9 @@ package pbservice
 
 import (
 	"crypto/rand"
-	"fmt"
 	"math/big"
 	"net/rpc"
+	"time"
 	"viewservice"
 )
 
@@ -60,7 +60,8 @@ func call(srv string, rpcname string,
 		return true
 	}
 
-	fmt.Println(err)
+	//fmt.Println("the caller return the err:")
+	//fmt.Println(err)
 	return false
 }
 
@@ -84,7 +85,8 @@ func (ck *Clerk) Get(key string) string {
 			//log.Printf("the result of the value is %+v", reply.Value)
 			return reply.Value
 		} else {
-			//重新获取 primary
+			//重新获取 primary sleep for a while
+			time.Sleep(viewservice.PingInterval)
 			Primary = ck.vs.Primary()
 			//log.Printf("reget the primary url %s", Primary)
 		}
@@ -96,6 +98,7 @@ func (ck *Clerk) Get(key string) string {
 //
 // send a Put or Append RPC
 //
+
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 	// Your code here.
@@ -107,19 +110,19 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	args.Type = op
 	sucess := false
 	for !sucess {
-		//log.Printf("now the primary is %+v", ck)
 		for ck.Primary == "" {
 			ck.Primary = ck.vs.Primary()
 		}
+		//log.Printf("the request XID is %d,and the pme is %s", args.XID, ck.Primary)
 		sucess := call(ck.Primary, "PBServer.PutAppend", &args, &reply)
+		//log.Printf("--------- return %t -----------the request XID %d ,the pb server is %s",sucess, args.XID,  ck.Primary)
 		if sucess {
 			break
 		} else {
+			time.Sleep(viewservice.PingInterval)
 			ck.Primary = ck.vs.Primary()
 		}
-		//log.Printf("the ck.Primary is %s ,the sucess status is %t", ck.Primary, sucess)
 	}
-	//log.Printf("the put append is over")
 }
 
 //
