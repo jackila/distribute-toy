@@ -1010,6 +1010,7 @@ func TestPartition1(t *testing.T) {
 	go func() {
 		local_stale := false
 		defer func() { stale_get <- local_stale }()
+		//log.Printf("now i will fetch the key of a by proxy")
 		x := ck1.Get("a")
 		if x == "1" {
 			local_stale = true
@@ -1021,6 +1022,7 @@ func TestPartition1(t *testing.T) {
 
 	for iter := 0; iter < viewservice.DeadPings*3; iter++ {
 		if vck.Primary() == s2.me {
+			//log.Printf("now the primary is %s", vck.Primary())
 			break
 		}
 		time.Sleep(viewservice.PingInterval)

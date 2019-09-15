@@ -78,11 +78,16 @@ func (ck *Clerk) Get(key string) string {
 	args := new(GetArgs)
 	reply := new(GetReply)
 	args.Key = key
+	args.ClientRequest = true
 	Primary := ck.Primary
 	for Primary != "" {
 		sucess := call(Primary, "PBServer.Get", &args, &reply)
+		//log.Printf("after the proxy the value will get %t,and the vs is %+v", sucess, ck.vs)
 		if sucess {
 			//log.Printf("the result of the value is %+v", reply.Value)
+			if reply.Err != "" {
+				return ""
+			}
 			return reply.Value
 		} else {
 			//重新获取 primary sleep for a while
@@ -108,6 +113,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	args.Key = key
 	args.Value = value
 	args.Type = op
+	args.ClientRequest = true
 	sucess := false
 	for !sucess {
 		for ck.Primary == "" {

@@ -28,6 +28,10 @@ type PBServer struct {
 func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 
 	// Your code here.
+	if pb.me != pb.view.Primary && args.ClientRequest {
+		reply.Err = ErrWrongServer
+		return nil
+	}
 	pb.mu.Lock()
 	value, _ := pb.store[args.Key]
 	reply.Value = value
@@ -39,6 +43,11 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 
 	// Your code here.
+
+	if pb.me != pb.view.Primary && args.ClientRequest {
+		reply.Err = ErrWrongServer
+		return nil
+	}
 	pb.mu.Lock()
 	//log.Printf("now the request is %d and the me is %s and the view is %+v", args.XID, pb.me, pb.view)
 	key := args.XID
@@ -69,6 +78,7 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	for pb.me == pb.view.Primary && pb.view.Backup != "" {
 
 		backArgs := args
+		backArgs.ClientRequest = false
 		backReply := new(PutAppendReply)
 		backArgs.Value = args.Value
 		success := call(pb.view.Backup, "PBServer.PutAppend", &backArgs, &backReply)
@@ -96,7 +106,7 @@ func (pb *PBServer) tick() {
 	}
 	vclerk := pb.vs
 	view, _ := vclerk.Ping(viewNum)
-
+	//log.Printf("the sever %s should get %+v", pb.me, view)
 	if pb.view.Primary == pb.me && pb.view.Backup == "" && view.Backup != "" {
 		//log.Printf("数据同步,p to b")
 		//send the store to backup
