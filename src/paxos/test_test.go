@@ -1,15 +1,18 @@
 package paxos
 
-import "testing"
-import "runtime"
-import "strconv"
-import "os"
-import "time"
-import "fmt"
-import "math/rand"
-import crand "crypto/rand"
-import "encoding/base64"
-import "sync/atomic"
+import (
+	"fmt"
+	"math/rand"
+	"os"
+	"runtime"
+	"strconv"
+	"testing"
+	"time"
+
+	crand "crypto/rand"
+	"encoding/base64"
+	"sync/atomic"
+)
 
 func randstring(n int) string {
 	b := make([]byte, 2*n)
@@ -390,6 +393,7 @@ func TestForgetMem(t *testing.T) {
 
 	runtime.GC()
 	var m0 runtime.MemStats
+
 	runtime.ReadMemStats(&m0)
 	// m0.Alloc about a megabyte
 
@@ -404,9 +408,9 @@ func TestForgetMem(t *testing.T) {
 
 	runtime.GC()
 	var m1 runtime.MemStats
+
 	runtime.ReadMemStats(&m1)
 	// m1.Alloc about 90 megabytes
-
 	for i := 0; i < npaxos; i++ {
 		pxa[i].Done(10)
 	}
@@ -424,7 +428,6 @@ func TestForgetMem(t *testing.T) {
 	var m2 runtime.MemStats
 	runtime.ReadMemStats(&m2)
 	// m2.Alloc about 10 megabytes
-
 	if m2.Alloc > (m1.Alloc / 2) {
 		t.Fatalf("memory use did not shrink enough")
 	}
