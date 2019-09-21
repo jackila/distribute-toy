@@ -2,6 +2,7 @@ package paxos
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"runtime"
@@ -38,6 +39,7 @@ func ndecided(t *testing.T, pxa []*Paxos, seq int) int {
 	for i := 0; i < len(pxa); i++ {
 		if pxa[i] != nil {
 			decided, v1 := pxa[i].Status(seq)
+			//log.Printf("the seq %d and the pxa %d decided is %d", seq, i, decided)
 			if decided == Decided {
 				if count > 0 && v != v1 {
 					t.Fatalf("decided values do not match; seq=%v i=%v v=%v v1=%v",
@@ -689,13 +691,14 @@ func TestManyUnreliable(t *testing.T) {
 		// only 3 active instances, to limit the
 		// number of file descriptors.
 		for seq >= 3 && ndecided(t, pxa, seq-3) < npaxos {
+			//log.Printf("the seq is %d and the seq -3 is not the end now the dicide is %d", seq, ndecided(t, pxa, seq-3))
 			time.Sleep(20 * time.Millisecond)
 		}
 		for i := 0; i < npaxos; i++ {
 			pxa[i].Start(seq, (seq*10)+i)
 		}
 	}
-
+	log.Printf("now we have finish 50")
 	for {
 		done := true
 		for seq := 1; seq < ninst; seq++ {

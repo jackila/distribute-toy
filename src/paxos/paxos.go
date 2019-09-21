@@ -39,9 +39,6 @@ import (
 // or it was agreed but forgotten (i.e. < Min()).
 type Fate int
 
-const INT_MAX = int(^uint(0) >> 1)
-const INT_MIN = ^INT_MAX
-
 const (
 	Decided   Fate = iota + 1
 	Pending        // not yet decided.
@@ -92,7 +89,7 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 	if err != nil {
 		err1 := err.(*net.OpError)
 		if err1.Err != syscall.ENOENT && err1.Err != syscall.ECONNREFUSED {
-			fmt.Printf("paxos Dial() failed: %v\n", err1)
+			//fmt.Printf("paxos Dial() failed: %v\n", err1)
 		}
 		return false
 	}
@@ -102,7 +99,7 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 		return true
 	}
 
-	fmt.Println(err)
+	//fmt.Println(err)
 	return false
 }
 
@@ -116,24 +113,31 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 func (px *Paxos) Start(seq int, v interface{}) {
 	// Your code here.
 
+	if seq < px.Min() {
+		return
+	}
 	//args := RequestArgs{1, nil, 3, "12"}
-	go func(v interface{}) {
-		//choose unique n
-
-		n := (int(time.Now().Unix()) << 5) | px.me
-		aok := false
-		//send prepare to all
-		value, pok := prepare(n, px, v, seq)
-		//send accept to all
-		if pok {
-			aok = accept(n, px, value, seq)
-			//log.Printf("the seq is %d,the number is %d and the aok is %t", seq, n, aok)
+	go func(v interface{}, seq int) {
+		node, ok := px.prepareStatus.Find(seq)
+		for !ok || !node.State.Done {
+			//choose unique n
+			n := (int(time.Now().Unix()) << 5) | px.me
+			aok := false
+			//send prepare to all
+			value, pok := prepare(n, px, v, seq)
+			//send accept to all
+			if pok {
+				aok = accept(n, px, value, seq)
+				//log.Printf("the seq is %d,the number is %d and the aok is %t", seq, n, aok)
+			}
+			if aok {
+				//send decide to all
+				decided(seq, px, value)
+			}
+			//time.Sleep(20 * time.Millisecond)
+			node, ok = px.prepareStatus.Find(seq)
 		}
-		if aok {
-			//send decide to all
-			decided(seq, px, value)
-		}
-	}(v)
+	}(v, seq)
 
 }
 
@@ -208,7 +212,6 @@ func decided(seq int, px *Paxos, v interface{}) {
 			px.DecidedHandler(args, &reply)
 		}
 		if reply.Success {
-
 			successReply = append(successReply, reply)
 		}
 	}
