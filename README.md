@@ -1,7 +1,6 @@
 # mit6.824
 follow 2015 version to code distribute system
 
-# 学习进度
 
 Sep 1, 2019 10:36 AM
 
@@ -22,6 +21,5 @@ Sep 15, 2019 12:23 PM
 -- lab3 part B
 finished
 
-# 学习困难
 
 the really work code is only little .and the test code is vary import
